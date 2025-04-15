@@ -1,10 +1,8 @@
 import sqlite3
 
-# Izveido savienojumu ar datubāzi (fails tiks izveidots, ja neeksistē)
+# Izveido savienojumu ar datubāzi un tabulu
 conn = sqlite3.connect("pulcinu_pieteiksanas.db")
 cursor = conn.cursor()
-
-# Izveido tabulu, ja tā vēl neeksistē
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS pieteikumi (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,32 +15,26 @@ ieprieks TEXT,
 informacijas_avots TEXT
 )
 ''')
+
 # Funkcija pieteikumam
 
 def pieteikties_pulcinam():
     print("== R6VSK Pulciņu Pieteikšanās ==")
-vards = input("Vārds: ")
-uzvards = input("Uzvārds: ")
-klase = input("Klase: ")
-novirziens = input("Pulciņa novirziens: ")
-pulcins = input("Izvēlētais pulciņš (piem. Datorzinības, Mūzika utt.): ")
-ieprieks = input("Vai esat piedalījies iepriekš? (jā/ne): ").lower()
-informacijas_avots = input("Kā uzzinājāt par pulciņu? (Mājaslapa, Draugi, Soc. tīkli, Cits): ")
+    dati = (
+        input("Vārds: "),
+        input("Uzvārds: "),
+        input("Klase: "),
+        input("Pulciņa novirziens: "),
+        input("Izvēlētais pulciņš: "),
+        input("Vai esat piedalījies iepriekš? (jā/ne): ").lower(),
+        input("Kā uzzinājāt par pulciņu?: ")
+    )
+    cursor.execute('''
+    INSERT INTO pieteikumi (vards, uzvards, klase, novirziens, pulcins, ieprieks, informacijas_avots)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', dati)
+    conn.commit()
+    print("\nPaldies! Jūsu pieteikums tika saglabāts datubāzē.")
 
-
-
-# Datu ievietošana datubāzē
-
-cursor.execute('''
-INSERT INTO pieteikumi (vards, uzvards, klase, novirziens, pulcins, ieprieks, informacijas_avots)
-VALUES (?, ?, ?, ?, ?, ?, ?)
-''', (vards, uzvards, klase, novirziens, pulcins, ieprieks, informacijas_avots))
-conn.commit()
-
-print("\nPaldies! Jūsu pieteikums tika saglabāts datubāzē.")
-# Izsauc funkciju
 pieteikties_pulcinam()
-
-# Aizver datubāzes savienojumu
-
 conn.close()
