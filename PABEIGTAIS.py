@@ -1,13 +1,36 @@
 import sqlite3
 
-def main():
-    # Izveido savienojumu ar datubāzi un izsauc galveno izvēlni
-    with sqlite3.connect("pulcinu_pieteiksanas.db") as conn:
-        cursor = conn.cursor()
-        izvele(cursor)
+# Izveido savienojumu ar datubāzi un tabulas
+conn = sqlite3.connect("pulcinu_pieteiksanas.db")
+cursor = conn.cursor()
 
-def izvele(cursor):
-    # Galvenā izvēlne, kas ļauj lietotājam izvēlēties darbību
+# Tabulu izveide
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS pulcini (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+nosaukums TEXT,
+skolotajs TEXT,
+laiks TEXT,
+kabinets TEXT,
+pieejamas_vietas INTEGER
+)
+''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS pieteikumi (
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+vards TEXT,
+uzvards TEXT,
+klase TEXT,
+pulcins_id INTEGER,
+ieprieks TEXT,
+informacijas_avots TEXT,
+FOREIGN KEY (pulcins_id) REFERENCES pulcini (id)
+)
+''')
+
+# Funkcija autentifikācijai
+def autentifikacija():
     while True:
         print("\n== R6VSK Pulciņu Sistēma ==")
         print("1) Pieteikties pulciņam")
@@ -101,9 +124,9 @@ def statistika(cursor):
     GROUP BY pulcini.nosaukums
     ORDER BY pieteikumu_skaits DESC
     ''')
-    print("== Pulciņu Statistika ==")
-    for pulcins in cursor.fetchall():
-        # Izvada katra pulciņa nosaukumu un pieteikumu skaitu
+    popularitate = cursor.fetchall()
+    print("Populārākie pulciņi:")
+    for pulcins in popularitate:
         print(f"{pulcins[0]} - {pulcins[1]} pieteikumi")
 
 
