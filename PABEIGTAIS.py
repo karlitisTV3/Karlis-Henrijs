@@ -7,26 +7,25 @@ cursor = conn.cursor()
 # Tabulu izveide
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS pulcini (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-nosaukums TEXT,
-skolotajs TEXT,
-laiks TEXT,
-kabinets TEXT,
-pieejamas_vietas INTEGER
-)
-''')
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nosaukums TEXT,
+    skolotajs TEXT,
+    laiks TEXT,
+    kabinets TEXT,
+    pieejamas_vietas INTEGER
+);''')
 
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS pieteikumi (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-vards TEXT,
-uzvards TEXT,
-klase TEXT,
-pulcins_id INTEGER,
-ieprieks TEXT,
-informacijas_avots TEXT,
-FOREIGN KEY (pulcins_id) REFERENCES pulcini (id)
-)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vards TEXT,
+    uzvards TEXT,
+    klase TEXT,
+    pulcins_id INTEGER,
+    ieprieks TEXT,
+    informacijas_avots TEXT,
+    FOREIGN KEY (pulcins_id) REFERENCES pulcini (id)
+);
 ''')
 
 # Funkcija autentifikācijai
@@ -113,9 +112,12 @@ def statistika():
     ORDER BY pieteikumu_skaits DESC
     ''')
     popularitate = cursor.fetchall()
-    print("Populārākie pulciņi:")
-    for pulcins in popularitate:
-        print(f"{pulcins[0]} - {pulcins[1]} pieteikumi")
+    if not popularitate:
+        print("Nav pieejamu datu par pulciņu statistiku.\n")
+    else:
+        print("Populārākie pulciņi:")
+        for pulcins in popularitate:
+            print(f"{pulcins[0]} - {pulcins[1]} pieteikumi")
 
 # Galvenā izvēlne
 def galvena_izvelne():
