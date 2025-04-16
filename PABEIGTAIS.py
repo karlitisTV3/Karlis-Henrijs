@@ -106,6 +106,7 @@ def statistika(cursor):
         # Izvada katra pulciņa nosaukumu un pieteikumu skaitu
         print(f"{pulcins[0]} - {pulcins[1]} pieteikumi")
 
+
 if __name__ == "__main__":
     # Programmas sākumpunkts
     main()
