@@ -1,110 +1,99 @@
 import sqlite3
 
-# Izveido savienojumu ar datubāzi un tabulas
-conn = sqlite3.connect("pulcinu_pieteiksanas.db")
-cursor = conn.cursor()
+def main():
+    # Izveido savienojumu ar datubāzi un izsauc galveno izvēlni
+    with sqlite3.connect("pulcinu_pieteiksanas.db") as conn:
+        cursor = conn.cursor()
+        izvele(cursor)
 
-# Tabulu izveide
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS pulcini (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-nosaukums TEXT,
-skolotajs TEXT,
-laiks TEXT,
-kabinets TEXT,
-pieejamas_vietas INTEGER
-)
-''')
-
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS pieteikumi (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-vards TEXT,
-uzvards TEXT,
-klase TEXT,
-pulcins_id INTEGER,
-ieprieks TEXT,
-informacijas_avots TEXT,
-FOREIGN KEY (pulcins_id) REFERENCES pulcini (id)
-)
-''')
-
-# Funkcija autentifikācijai
-def autentifikacija():
+def izvele(cursor):
+    # Galvenā izvēlne, kas ļauj lietotājam izvēlēties darbību
     while True:
-        epasts = input("Ievadiet savu skolas e-pastu: ")
-        if "@edu.riga.lv" not in epasts:
-            print("Nepareizs e-pasts. Lūdzu, mēģiniet vēlreiz.\n")
-        else:
-            print("Autentifikācija veiksmīga!\n")
+        print("\n== R6VSK Pulciņu Sistēma ==")
+        print("1) Pieteikties pulciņam")
+        print("2) Skatīt statistiku")
+        print("3) Iziet")
+        izvele = input("Tava izvēle - ")
+
+        if izvele == "1":
+            # Izsauc funkciju pieteikties
+            pieteikties(cursor)
+        elif izvele == "2":
+            # Izsauc funkciju statistika
+            statistika(cursor)
+        elif izvele == "3":
+            # Iziet no programmas
+            print("Uz redzēšanos!")
             break
+        else:
+            # Apstrādā nederīgu izvēli
+            print("Nederīga izvēle!")
 
-# Funkcija pieteikumam
-def pieteikties_pulcinam():
-    autentifikacija()
-    while True:
-        print("== R6VSK Pulciņu Pieteikšanās ==")
-        vards = input("Vārds: ").strip()
-        uzvards = input("Uzvārds: ").strip()
-        klase = input("Klase: ").strip()
+def pieteikties(cursor):
+    # Funkcija, lai pievienotu jaunu pieteikumu pulciņam
+    epasts = input("Ievadiet savu skolas e-pastu: ")
+    if "@edu.riga.lv" not in epasts:
+        # Validē e-pasta adresi
+        print("Nepareizs e-pasts!")
+        return
 
-        if not vards or not uzvards or not klase:
-            print("Visi lauki ir obligāti. Lūdzu, mēģiniet vēlreiz.\n")
-            continue
+    # Iegūst lietotāja informāciju
+    vards = input("Vārds: ").strip()
+    uzvards = input("Uzvārds: ").strip()
+    klase = input("Klase: ").strip()
 
-        cursor.execute("SELECT id, nosaukums, skolotajs, laiks, kabinets, pieejamas_vietas FROM pulcini")
-        pulcini = cursor.fetchall()
+    if not all([vards, uzvards, klase]):
+        # Pārbauda, vai visi lauki ir aizpildīti
+        print("Visi lauki ir obligāti!")
+        return
 
-        if not pulcini:
-            print("Nav pieejamu pulciņu.\n")
-            return
+    # Iegūst pieejamo pulciņu sarakstu no datubāzes
+    cursor.execute("SELECT * FROM pulcini")
+    pulcini = cursor.fetchall()
+    if not pulcini:
+        # Ja nav pieejamu pulciņu
+        print("Nav pieejamu pulciņu.")
+        return
 
-        print("Pieejamie pulciņi:")
-        for pulcins in pulcini:
-            print(f"{pulcins[0]}. {pulcins[1]} - {pulcins[2]} ({pulcins[3]}, Kabinets: {pulcins[4]}, Pieejamas vietas: {pulcins[5]})")
+    # Parāda pieejamos pulciņus
+    print("Pieejamie pulciņi:")
+    for pulcins in pulcini:
+        print(f"{pulcins[0]}. {pulcins[1]} - {pulcins[2]} ({pulcins[3]}, Kabinets: {pulcins[4]}, Pieejamas vietas: {pulcins[5]})")
 
-        try:
-            pulcins_id = int(input("Izvēlieties pulciņa ID: "))
-            izvēlētais_pulcins = next(p for p in pulcini if p[0] == pulcins_id)
-        except (ValueError, StopIteration):
-            print("Nepareizs pulciņa ID. Lūdzu, mēģiniet vēlreiz.\n")
-            continue
+    try:
+        # Lietotājs izvēlas pulciņa ID
+        pulcins_id = int(input("Izvēlieties pulciņa ID: "))
+        izvēlētais_pulcins = next(p for p in pulcini if p[0] == pulcins_id)
+    except (ValueError, StopIteration):
+        # Apstrādā kļūdas, ja ievadīts nederīgs ID
+        print("Nepareizs pulciņa ID!")
+        return
 
-        if izvēlētais_pulcins[5] <= 0:
-            print("Šis pulciņš ir pilns. Lūdzu, izvēlieties citu.\n")
-            continue
+    if izvēlētais_pulcins[5] <= 0:
+        # Pārbauda, vai pulciņā ir pieejamas vietas
+        print("Šis pulciņš ir pilns!")
+        return
 
-        ieprieks = input("Vai esat piedalījies iepriekš? (jā/ne): ").lower()
-        informacijas_avots = input("Kā uzzinājāt par pulciņu?: ").strip()
+    # Iegūst papildu informāciju no lietotāja
+    ieprieks = input("Vai esat piedalījies iepriekš? (jā/ne): ").lower()
+    informacijas_avots = input("Kā uzzinājāt par pulciņu?: ").strip()
 
-        # Dubultu pieteikumu pārbaude
-        cursor.execute('''
-        SELECT * FROM pieteikumi WHERE vards = ? AND uzvards = ? AND pulcins_id = ?
-        ''', (vards, uzvards, pulcins_id))
-        if cursor.fetchone():
-            print("Jūs jau esat pieteicies šim pulciņam.\n")
-            continue
+    # Pārbauda, vai lietotājs jau ir pieteicies šim pulciņam
+    cursor.execute('SELECT * FROM pieteikumi WHERE vards = ? AND uzvards = ? AND pulcins_id = ?', (vards, uzvards, pulcins_id))
+    if cursor.fetchone():
+        print("Jūs jau esat pieteicies šim pulciņam!")
+        return
 
-        # Saglabā pieteikumu
-        cursor.execute('''
-        INSERT INTO pieteikumi (vards, uzvards, klase, pulcins_id, ieprieks, informacijas_avots)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ''', (vards, uzvards, klase, pulcins_id, ieprieks, informacijas_avots))
-        conn.commit()
+    # Pievieno jaunu pieteikumu un atjaunina pieejamo vietu skaitu
+    cursor.execute('''
+    INSERT INTO pieteikumi (vards, uzvards, klase, pulcins_id, ieprieks, informacijas_avots)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ''', (vards, uzvards, klase, pulcins_id, ieprieks, informacijas_avots))
+    cursor.execute('UPDATE pulcini SET pieejamas_vietas = pieejamas_vietas - 1 WHERE id = ?', (pulcins_id,))
+    print(f"Pieteikums uz '{izvēlētais_pulcins[1]}' tika veiksmīgi pievienots!")
 
-        # Atjaunina pieejamo vietu skaitu
-        cursor.execute('''
-        UPDATE pulcini SET pieejamas_vietas = pieejamas_vietas - 1 WHERE id = ?
-        ''', (pulcins_id,))
-        conn.commit()
-
-        print(f"\nPaldies! Jūsu pieteikums uz '{izvēlētais_pulcins[1]}' tika saglabāts.")
-        print(f"Pulciņa informācija: {izvēlētais_pulcins[3]}, Kabinets: {izvēlētais_pulcins[4]}, Pasniedzējs: {izvēlētais_pulcins[2]}\n")
-        break
-
-# Funkcija statistikai
-def statistika():
-    print("== Pulciņu Statistika ==")
+def statistika(cursor):
+    # Parāda statistiku par pulciņiem, sakārtojot pēc pieteikumu skaita
     cursor.execute('''
     SELECT pulcini.nosaukums, COUNT(pieteikumi.id) AS pieteikumu_skaits
     FROM pieteikumi
@@ -112,29 +101,11 @@ def statistika():
     GROUP BY pulcini.nosaukums
     ORDER BY pieteikumu_skaits DESC
     ''')
-    popularitate = cursor.fetchall()
-    print("Populārākie pulciņi:")
-    for pulcins in popularitate:
+    print("== Pulciņu Statistika ==")
+    for pulcins in cursor.fetchall():
+        # Izvada katra pulciņa nosaukumu un pieteikumu skaitu
         print(f"{pulcins[0]} - {pulcins[1]} pieteikumi")
 
-# Galvenā izvēlne
-def galvena_izvelne():
-    while True:
-        print("\n== R6VSK Pulciņu Sistēma ==")
-        print("1. Pieteikties pulciņam")
-        print("2. Skatīt statistiku")
-        print("3. Iziet")
-        izvele = input("Izvēlieties darbību: ").strip()
-
-        if izvele == "1":
-            pieteikties_pulcinam()
-        elif izvele == "2":
-            statistika()
-        elif izvele == "3":
-            print("Uz redzēšanos!")
-            break
-        else:
-            print("Nepareiza izvēle. Lūdzu, mēģiniet vēlreiz.\n")
-
-galvena_izvelne()
-conn.close()
+if __name__ == "__main__":
+    # Programmas sākumpunkts
+    main()
