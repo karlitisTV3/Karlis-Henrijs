@@ -4,7 +4,22 @@ def main():
     # Izveido savienojumu ar datubāzi
     with sqlite3.connect("pulcinu_pieteiksanas.db") as conn:
         cursor = conn.cursor()
+        parbauda_db(cursor)  # Pārbauda datubāzes darbību 
         izvele(cursor)
+
+def parbauda_db(cursor):
+    # Pārbauda un atjaunina datubāzes shēmu
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS pieteikumi (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vards TEXT NOT NULL,
+        uzvards TEXT NOT NULL,
+        klase TEXT NOT NULL,
+        pulcins_id INTEGER NOT NULL,
+        ieprieks TEXT,
+        informacijas_avots TEXT
+    )
+    ''')
 
 def izvele(cursor):
     # Galvenā izvēlne
