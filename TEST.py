@@ -1,110 +1,202 @@
+from flask import Flask, render_template_string, request, redirect, url_for, flash, session
 import sqlite3
-import tkinter as tk
-from tkinter import messagebox, simpledialog
 import logging
+import tkinter as tk
+from tkinter import ttk
+from threading import Thread
+import requests
 
-# Configure logging
+app = Flask(__name__)
+app.secret_key = "supersecretkey"
+
 logging.basicConfig(filename="application.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def main():
-    root = tk.Tk()
-    root.title("R6VSK Pulciņu Sistēma")
-    root.geometry("400x300")
+def get_db():
     conn = sqlite3.connect("pulcinu_pieteiksanas.db")
-    cursor = conn.cursor()
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    # User authentication
-    def authenticate_user():
-        username = simpledialog.askstring("Lietotājvārds", "Ievadiet savu lietotājvārdu:")
-        password = simpledialog.askstring("Parole", "Ievadiet savu paroli:", show="*")
+@app.route("/", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
         if not username or not password:
-            messagebox.showerror("Kļūda", "Lietotājvārds un parole ir obligāti!")
-            return False
-
-        cursor.execute("SELECT * FROM lietotaji WHERE lietotajvards = ? AND parole = ?", (username, password))
-        user = cursor.fetchone()
+            flash("Lietotājvārds un parole ir obligāti!", "danger")
+            return redirect(url_for("login"))
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM lietotaji WHERE lietotajvards = ? AND parole = ?", (username, password))
+        user = cur.fetchone()
+        conn.close()
         if user:
+            session["user"] = username
             logging.info(f"Lietotājs '{username}' veiksmīgi autentificējās.")
-            return True
+            return redirect(url_for("index"))
         else:
             logging.warning(f"Neveiksmīgs autentifikācijas mēģinājums lietotājam '{username}'.")
-            messagebox.showerror("Kļūda", "Nepareizs lietotājvārds vai parole!")
+            flash("Nepareizs lietotājvārds vai parole!", "danger")
+    return render_template_string('''
+    <!doctype html>
+    <title>Pieslēgties</title>
+    <h2>Pieslēgties</h2>
+    <form method="post">
+        <input name="username" placeholder="Lietotājvārds"><br>
+        <input name="password" type="password" placeholder="Parole"><br>
+        <button type="submit">Ieiet</button>
+    </form>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul>
+        {% for category, message in messages %}
+          <li style="color:red;">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    ''')
+
+@app.route("/index")
+def index():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    return render_template_string('''
+    <!doctype html>
+    <title>R6VSK Pulciņu Sistēma</title>
+    <h2>Laipni lūdzam, {{session['user']}}!</h2>
+    <a href="{{ url_for('pieteikties') }}">Pieteikties pulciņam</a><br>
+    <a href="{{ url_for('statistika') }}">Skatīt statistiku</a><br>
+    <a href="{{ url_for('logout') }}">Iziet</a>
+    ''')
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect(url_for("login"))
+
+@app.route("/pieteikties", methods=["GET", "POST"])
+def pieteikties():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM pulcini")
+    pulcini = cur.fetchall()
+    if request.method == "POST":
+        epasts = request.form["epasts"]
+        vards = request.form["vards"]
+        uzvards = request.form["uzvards"]
+        klase = request.form["klase"]
+        pulcins_id = request.form.get("pulcins_id")
+        try:
+            pulcins_id_int = int(pulcins_id)
+        except (TypeError, ValueError):
+            pulcins_id_int = None
+        if not epasts or "@edu.riga.lv" not in epasts:
+            flash("Nepareizs e-pasts!", "danger")
+        elif not all([vards, uzvards, klase, pulcins_id]) or pulcins_id_int is None:
+            flash("Visi lauki ir obligāti!", "danger")
+        else:
+            cur.execute("SELECT * FROM pulcini WHERE id = ?", (pulcins_id_int,))
+            izvēlētais_pulcins = cur.fetchone()
+            if not izvēlētais_pulcins or izvēlētais_pulcins["pieejamas_vietas"] <= 0:
+                flash("Nepareizs vai pilns pulciņš!", "danger")
+            else:
+                cur.execute('SELECT * FROM pieteikumi WHERE vards = ? AND uzvards = ? AND pulcins_id = ?', (vards, uzvards, pulcins_id_int))
+                if cur.fetchone():
+                    flash("Jūs jau esat pieteicies šim pulciņam!", "info")
+                else:
+                    cur.execute('INSERT INTO pieteikumi (vards, uzvards, klase, pulcins_id) VALUES (?, ?, ?, ?)', (vards, uzvards, klase, pulcins_id_int))
+                    cur.execute('UPDATE pulcini SET pieejamas_vietas = pieejamas_vietas - 1 WHERE id = ?', (pulcins_id_int,))
+                    conn.commit()
+                    flash(f"Pieteikums uz '{izvēlētais_pulcins['nosaukums']}' tika veiksmīgi pievienots!", "success")
+    conn.close()
+    return render_template_string('''
+    <!doctype html>
+    <title>Pieteikties pulciņam</title>
+    <h2>Pieteikties pulciņam</h2>
+    <form method="post">
+        E-pasts: <input name="epasts"><br>
+        Vārds: <input name="vards"><br>
+        Uzvārds: <input name="uzvards"><br>
+        Klase: <input name="klase"><br>
+        Pulciņš:
+        <select name="pulcins_id">
+            <option value="">Izvēlies...</option>
+            {% for p in pulcini %}
+                <option value="{{p['id']}}">{{p['nosaukums']}} (Pieejamas vietas: {{p['pieejamas_vietas']}})</option>
+            {% endfor %}
+        </select><br>
+        <button type="submit">Pieteikties</button>
+    </form>
+    <a href="{{ url_for('index') }}">Atpakaļ</a>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul>
+        {% for category, message in messages %}
+          <li style="color:{{'green' if category=='success' else 'red'}};">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    ''', pulcini=pulcini)
+
+@app.route("/statistika")
+def statistika():
+    if "user" not in session:
+        return redirect(url_for("login"))
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT pulcini.nosaukums, COUNT(pieteikumi.id) AS pieteikumu_skaits
+        FROM pieteikumi
+        JOIN pulcini ON pieteikumi.pulcins_id = pulcini.id
+        GROUP BY pulcini.nosaukums
+    ''')
+    stats = cur.fetchall()
+    conn.close()
+    return render_template_string('''
+    <!doctype html>
+    <title>Statistika</title>
+    <h2>Pulciņu Statistika</h2>
+    <ul>
+    {% for pulcins in stats %}
+        <li>{{ pulcins[0] }} - {{ pulcins[1] }} pieteikumi</li>
+    {% endfor %}
+    </ul>
+    <a href="{{ url_for('index') }}">Atpakaļ</a>
+    ''', stats=stats)
+
+def open_tkinter_window():
+    def check_server():
+        try:
+            requests.get("http://127.0.0.1:5000/")
+            return True
+        except requests.ConnectionError:
             return False
 
-    # Enhanced error handling
-    def execute_query(query, params=()):
-        try:
-            cursor.execute(query, params)
-            conn.commit()
-        except sqlite3.Error as e:
-            logging.error(f"SQL kļūda: {e}")
-            messagebox.showerror("Kļūda", f"Radās kļūda: {e}")
+    def start_flask_app():
+        app.run()
 
-    def pieteikties():
-        epasts = simpledialog.askstring("E-pasts", "Ievadiet savu skolas e-pastu:")
-        if not epasts or "@edu.riga.lv" not in epasts:
-            messagebox.showerror("Kļūda", "Nepareizs e-pasts!")
-            return
+    # Start Flask app in a separate thread
+    flask_thread = Thread(target=start_flask_app, daemon=True)
+    flask_thread.start()
 
-        vards = simpledialog.askstring("Vārds", "Ievadiet savu vārdu:")
-        uzvards = simpledialog.askstring("Uzvārds", "Ievadiet savu uzvārdu:")
-        klase = simpledialog.askstring("Klase", "Ievadiet savu klasi:")
+    # Wait for the server to start
+    while not check_server():
+        pass
 
-        if not all([vards, uzvards, klase]):
-            messagebox.showerror("Kļūda", "Visi lauki ir obligāti!")
-            return
+    # Create a tkinter window
+    root = tk.Tk()
+    root.title("Flask App")
+    root.geometry("800x600")
 
-        cursor.execute("SELECT * FROM pulcini")
-        pulcini = cursor.fetchall()
-        if not pulcini:
-            messagebox.showinfo("Informācija", "Nav pieejamu pulciņu.")
-            return
+    # Embed a web view using tkinter's ttk.Label
+    web_frame = ttk.Label(root, text="Flask app is running at http://127.0.0.1:5000/")
+    web_frame.pack(expand=True, fill="both")
 
-        pulcins_id = simpledialog.askinteger("Pulciņa ID", "Izvēlieties pulciņa ID:")
-        izvēlētais_pulcins = next((p for p in pulcini if p[0] == pulcins_id), None)
-        if not izvēlētais_pulcins or izvēlētais_pulcins[5] <= 0:
-            messagebox.showerror("Kļūda", "Nepareizs vai pilns pulciņš!")
-            return
-
-        cursor.execute('SELECT * FROM pieteikumi WHERE vards = ? AND uzvards = ? AND pulcins_id = ?', (vards, uzvards, pulcins_id))
-        if cursor.fetchone():
-            messagebox.showinfo("Informācija", "Jūs jau esat pieteicies šim pulciņam!")
-            return
-
-        try:
-            execute_query('''
-            INSERT INTO pieteikumi (vards, uzvards, klase, pulcins_id)
-            VALUES (?, ?, ?, ?)
-            ''', (vards, uzvards, klase, pulcins_id))
-            execute_query('UPDATE pulcini SET pieejamas_vietas = pieejamas_vietas - 1 WHERE id = ?', (pulcins_id,))
-            messagebox.showinfo("Veiksmīgi", f"Pieteikums uz '{izvēlētais_pulcins[1]}' tika veiksmīgi pievienots!")
-            logging.info(f"Pieteikums veiksmīgi pievienots: {vards} {uzvards}, Pulciņš ID: {pulcins_id}")
-        except Exception as e:
-            logging.error(f"Kļūda pieteikšanās procesā: {e}")
-            messagebox.showerror("Kļūda", "Radās neparedzēta kļūda!")
-
-    def statistika():
-        try:
-            cursor.execute('''
-            SELECT pulcini.nosaukums, COUNT(pieteikumi.id) AS pieteikumu_skaits
-            FROM pieteikumi
-            JOIN pulcini ON pieteikumi.pulcins_id = pulcini.id
-            GROUP BY pulcini.nosaukums
-            ''')
-            stats = "\n".join([f"{pulcins[0]} - {pulcins[1]} pieteikumi" for pulcins in cursor.fetchall()])
-            messagebox.showinfo("Statistika", stats)
-            logging.info("Statistika veiksmīgi iegūta.")
-        except Exception as e:
-            logging.error(f"Kļūda statistikas iegūšanā: {e}")
-            messagebox.showerror("Kļūda", "Radās neparedzēta kļūda!")
-
-    if authenticate_user():
-        tk.Button(root, text="Pieteikties pulciņam", command=pieteikties).pack(pady=10)
-        tk.Button(root, text="Skatīt statistiku", command=statistika).pack(pady=10)
-        tk.Button(root, text="Iziet", command=root.destroy).pack(pady=10)
-        root.mainloop()
-    else:
-        root.destroy()
+    # Run the tkinter main loop
+    root.mainloop()
 
 if __name__ == "__main__":
-    main()
+    open_tkinter_window()

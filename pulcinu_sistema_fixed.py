@@ -1,15 +1,16 @@
+
 import sqlite3
 
 def main():
     # Izveido savienojumu ar datubāzi
-    with sqlite3.connect("pulcinu_pieteiksanas.db") as conn:
+    with sqlite3.connect("pulcinu_pieteiksanas_fixed.db") as conn:
         cursor = conn.cursor()
-        parbauda_db(cursor)  # Pārbauda datubāzes darbību 
+        parbauda_db(cursor)  # Pārbauda datubāzes darbību
         izvele(cursor)
 
 def parbauda_db(cursor):
     # Pārbauda un atjaunina datubāzes shēmu
-    cursor.execute('''
+    cursor.execute("""
     CREATE TABLE IF NOT EXISTS pieteikumi (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         vards TEXT NOT NULL,
@@ -19,7 +20,17 @@ def parbauda_db(cursor):
         ieprieks TEXT,
         informacijas_avots TEXT
     )
-    ''')
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS pulcini (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nosaukums TEXT NOT NULL,
+        skolotajs TEXT NOT NULL,
+        laiks TEXT NOT NULL,
+        kabinets TEXT NOT NULL,
+        pieejamas_vietas INTEGER NOT NULL
+    )
+    """)
 
 def izvele(cursor):
     # Galvenā izvēlne
@@ -41,7 +52,6 @@ def izvele(cursor):
             print("Nederīga izvēle!")
 
 def pieteikties(cursor):
-    # Pievieno jaunu pieteikumu
     epasts = input("Ievadiet savu skolas e-pastu: ")
     if "@edu.riga.lv" not in epasts:
         print("Nepareizs e-pasts!")
@@ -84,22 +94,22 @@ def pieteikties(cursor):
         print("Jūs jau esat pieteicies šim pulciņam!")
         return
 
-    cursor.execute('''
+    cursor.execute("""
     INSERT INTO pieteikumi (vards, uzvards, klase, pulcins_id, ieprieks, informacijas_avots)
     VALUES (?, ?, ?, ?, ?, ?)
-    ''', (vards, uzvards, klase, pulcins_id, ieprieks, informacijas_avots))
+    """, (vards, uzvards, klase, pulcins_id, ieprieks, informacijas_avots))
+
     cursor.execute('UPDATE pulcini SET pieejamas_vietas = pieejamas_vietas - 1 WHERE id = ?', (pulcins_id,))
     print(f"Pieteikums uz '{izvēlētais_pulcins[1]}' tika veiksmīgi pievienots!")
 
 def statistika(cursor):
-    # Parāda statistiku par pulciņiem
-    cursor.execute('''
+    cursor.execute("""
     SELECT pulcini.nosaukums, COUNT(pieteikumi.id) AS pieteikumu_skaits
     FROM pieteikumi
     JOIN pulcini ON pieteikumi.pulcins_id = pulcini.id
     GROUP BY pulcini.nosaukums
     ORDER BY pieteikumu_skaits DESC
-    ''')
+    """)
     print("== Pulciņu Statistika ==")
     for pulcins in cursor.fetchall():
         print(f"{pulcins[0]} - {pulcins[1]} pieteikumi")
