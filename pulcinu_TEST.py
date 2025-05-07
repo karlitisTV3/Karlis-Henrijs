@@ -1,53 +1,45 @@
 import unittest
 import sqlite3
+import sys  # Ensure sys is imported for stdout redirection
 from pulcinu_sistema_fixed import parbauda_db, pieteikties, statistika
 
 class TestPulcinuSistema(unittest.TestCase):
     def setUp(self):
-        # Izveido in-memory datubāzi un inicializē tabulas
-        self.conn = sqlite3.connect(":memory:")
+        self.conn = sqlite3.connect(":memory:")  # Izveido in-memory datubāzi
         self.cursor = self.conn.cursor()
-        parbauda_db(self.cursor)
+        parbauda_db(self.cursor)  # Inicializē tabulas
 
     def tearDown(self):
-        # Aizver datubāzes savienojumu
-        self.conn.close()
+        self.conn.close()  # Aizver datubāzes savienojumu
 
     def test_parbauda_db(self):
-        # Pārbauda, vai tabulas tika izveidotas
         self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = {row[0] for row in self.cursor.fetchall()}
-        self.assertIn("pieteikumi", tables)
-        self.assertIn("pulcini", tables)
+        assert "pieteikumi" in tables
+        assert "pulcini" in tables
 
     def test_pieteikties(self):
-        # Pievieno testu datus
         self.cursor.execute("""
         INSERT INTO pulcini (nosaukums, skolotajs, laiks, kabinets, pieejamas_vietas)
         VALUES ('Datorika', 'Jānis Bērziņš', 'Pirmdiena 15:00', '101', 10)
         """)
         self.conn.commit()
 
-        # Simulē ievadi un pārbauda pieteikumu
         inputs = iter(["test@edu.riga.lv", "Karlis", "Henrijs", "12.a", "1", "nē", "Draugs"])
-        def mock_input(prompt):
-            return next(inputs)
+        __builtins__.input = lambda _: next(inputs)  # Mock input
 
-        original_input = __builtins__.input
-        __builtins__.input = mock_input
         try:
             pieteikties(self.cursor)
         finally:
-            __builtins__.input = original_input
+            __builtins__.input = input  # Atjauno input
 
         self.cursor.execute("SELECT * FROM pieteikumi")
         pieteikumi = self.cursor.fetchall()
-        self.assertEqual(len(pieteikumi), 1)
-        self.assertEqual(pieteikumi[0][1], "Karlis")
-        self.assertEqual(pieteikumi[0][2], "Henrijs")
+        assert len(pieteikumi) == 1
+        assert pieteikumi[0][1] == "Karlis"
+        assert pieteikumi[0][2] == "Henrijs"
 
     def test_statistika(self):
-        # Pievieno testu datus
         self.cursor.execute("""
         INSERT INTO pulcini (nosaukums, skolotajs, laiks, kabinets, pieejamas_vietas)
         VALUES ('Datorika', 'Jānis Bērziņš', 'Pirmdiena 15:00', '101', 10)
@@ -58,18 +50,16 @@ class TestPulcinuSistema(unittest.TestCase):
         """)
         self.conn.commit()
 
-        # Pārbauda statistikas izvadi
         import io
-        import sys
         captured_output = io.StringIO()
-        sys.stdout = captured_output
+        sys.stdout = captured_output  # Pārvērš stdout uz StringIO
+
         try:
             statistika(self.cursor)
         finally:
-            sys.stdout = sys.__stdout__
+            sys.stdout = sys.__stdout__  # Atjauno stdout
 
-        output = captured_output.getvalue()
-        self.assertIn("Datorika - 1 pieteikumi", output)
+        assert "Datorika - 1 pieteikumi" in captured_output.getvalue()
 
 if __name__ == "__main__":
     unittest.main()
