@@ -63,3 +63,15 @@ sqlite3.OperationalError: no such table: lietotaji
 2025-05-06 14:15:30,234 - INFO - 127.0.0.1 - - [06/May/2025 14:15:30] "POST / HTTP/1.1" 200 -
 2025-05-06 14:15:45,781 - ERROR - Datubâzes kïûda: no such table: lietotaji
 2025-05-06 14:15:45,784 - INFO - 127.0.0.1 - - [06/May/2025 14:15:45] "POST / HTTP/1.1" 200 -
+2025-05-07 13:47:51,086 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-05-07 13:47:51,088 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-07 13:47:51,592 - INFO - 127.0.0.1 - - [07/May/2025 13:47:51] "GET / HTTP/1.1" 200 -
+2025-05-07 13:47:53,200 - INFO - 127.0.0.1 - - [07/May/2025 13:47:53] "GET / HTTP/1.1" 200 -
+2025-05-07 13:47:53,446 - INFO - 127.0.0.1 - - [07/May/2025 13:47:53] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-05-07 13:48:00,377 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-05-07 13:48:00,378 - INFO - [33mPress CTRL+C to quit[0m
+2025-05-07 13:48:00,887 - INFO - 127.0.0.1 - - [07/May/2025 13:48:00] "GET / HTTP/1.1" 200 -
+2025-05-07 13:48:01,484 - INFO - 127.0.0.1 - - [07/May/2025 13:48:01] "GET / HTTP/1.1" 200 -
+2025-05-07 13:48:01,749 - INFO - 127.0.0.1 - - [07/May/2025 13:48:01] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
